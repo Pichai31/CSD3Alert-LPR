@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vehicle Passage Analysis Pro</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#07111f;color:#e5edf7;font-family:Arial,sans-serif}
+header,section{padding:16px;margin:12px}
+header{background:#0d1b2c;border-bottom:1px solid #1e5268}
+section{background:#0d1b2c;border:1px solid #20344a;border-radius:12px}
+h1,h2{color:#67e8f9}
+button,.btn{padding:10px 14px;background:#087e9b;color:white;border:0;border-radius:7px;cursor:pointer}
+input,select{padding:10px;background:#071321;color:white;border:1px solid #2a4057;border-radius:7px;max-width:100%}
+.controls{display:flex;gap:10px;flex-wrap:wrap}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.kpi{padding:12px;background:#071321;border-radius:8px}
+.kpi strong{display:block;font-size:23px;margin-top:6px}
+#map{height:460px;border-radius:10px}
+.tablewrap{overflow:auto;max-height:480px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td,th{padding:9px;border-bottom:1px solid #20344a;text-align:left;white-space:nowrap}
+th{color:#67e8f9;position:sticky;top:0;background:#0d1b2c}
+.muted{color:#9bb0c6;font-size:13px}
+footer{text-align:center;padding:20px;color:#9bb0c6}
+.car{width:28px;height:28px;border:2px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px}
+@media(max-width:600px){#map{height:350px}header,section{margin:8px;padding:12px}}
+</style>
+</head>
+
+<body>
+<header>
+  <h1>🚘 VEHICLE PASSAGE ANALYSIS PRO</h1>
+  <p>ระบบวิเคราะห์ข้อมูลการผ่านจุดตรวจจับรถยนต์</p>
+  <div class="controls">
+    <input id="file" type="file" accept=".xlsx,.xls,.csv">
+    <button id="export">ส่งออก CSV</button>
+    <button id="fit">แสดงทุกจุดบนแผนที่</button>
+  </div>
+  <p id="status" class="muted">กรุณาเลือกไฟล์ Excel หรือ CSV</p>
+</header>
+
+<section>
+  <h2>ตัวกรองข้อมูล</h2>
+  <div class="controls">
+    <label>ทะเบียนรถ<br><select id="plate"><option value="">ทุกทะเบียน</option></select></label>
+    <label>ค้นหาจุดกล้อง<br><input id="camera" placeholder="ชื่อกล้อง"></label>
+    <label>วันที่เริ่มต้น<br><input id="start" type="date"></label>
+    <label>วันที่สิ้นสุด<br><input id="end" type="date"></label>
+    <button id="clear">ล้างตัวกรอง</button>
+  </div>
+</section>
+
+<section class="kpis">
+  <div class="kpi">ทะเบียนไม่ซ้ำ<strong id="kPlates">0</strong></div>
+  <div class="kpi">รายการตรวจพบ<strong id="kRows">0</strong></div>
+  <div class="kpi">จำนวนครั้งที่ผ่าน<strong id="kPass">0</strong></div>
+  <div class="kpi">จุดตรวจจับ<strong id="kPoints">0</strong></div>
+  <div class="kpi">พิกัดถูกต้อง<strong id="kCoords">0</strong></div>
+  <div class="kpi">เวลาล่าสุด<strong id="kLatest" style="font-size:14px">—</strong></div>
+</section>
+
+<section>
+  <h2>แผนที่จุดตรวจพบ</h2>
+  <p class="muted">คลิกหมุดเพื่อดูทะเบียน วันเวลา และจำนวนครั้งที่พบ ณ จุดนั้น</p>
+  <div id="map"></div>
+  <p id="mapStatus" class="muted"></p>
+</section>
+
+<section>
+  <h2>จุดที่ผ่านบ่อยที่สุด</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr>
+        <th>จุดตรวจจับ</th><th>จำนวนครั้ง</th>
+        <th>ทะเบียนไม่ซ้ำ</th><th>เวลาล่าสุด</th><th>พิกัด</th>
+      </tr></thead>
+      <tbody id="frequent"><tr><td colspan="5">ยังไม่มีข้อมูล</td></tr></tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>รายการตรวจพบทั้งหมด</h2>
+  <p id="tableStatus" class="muted"></p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr>
+        <th>ทะเบียน</th><th>จุดตรวจจับ</th><th>วันเวลา</th>
+        <th>ละติจูด</th><th>ลองจิจูด</th><th>จำนวนครั้ง</th>
+      </tr></thead>
+      <tbody id="rows"><tr><td colspan="6">กรุณานำเข้าไฟล์</td></tr></tbody>
+    </table>
+  </div>
+</section>
+
+<footer>
+  ฝ่ายวิเคราะห์ข้อมูล ชุดปฏิบัติการพิเศษ<br>
+  ผู้สร้างรายงาน ส.ต.อ.พิชัย สมปัญญา
+</footer>
+
+<script>
+'use strict';
+
+const $ = id => document.getElementById(id);
+let allRows = [], filtered = [], map, markers;
+
+const palette = [
+  '#22d3ee','#fb7185','#a78bfa','#fbbf24',
+  '#4ade80','#60a5fa','#f472b6','#fb923c',
+  '#2dd4bf','#c084fc','#f87171','#a3e635'
+];
+
+function normalize(s) {
+  return String(s ?? '').toLowerCase().replace(/[\s_-]/g,'').trim();
+}
+
+function findColumn(keys, names) {
+  for (const name of names) {
+    const exact = keys.find(k => normalize(k) === normalize(name));
+    if (exact !== undefined) return exact;
+  }
+  for (const name of names) {
+    const found = keys.find(k => normalize(k).includes(normalize(name)));
+    if (found !== undefined) return found;
+  }
+  return '';
+}
+
+function numberValue(v) {
+  if (typeof v === 'number') return v;
+  let s = String(v ?? '').trim().replace(/,/g,'');
+  if (!s) return NaN;
+  // รองรับพิกัดที่มีเครื่องหมายทิศทาง
+  if (/^[\d.+-]+$/.test(s)) return Number(s);
+  return NaN;
+}
+
+function parseDate(v) {
+  if (v instanceof Date) {
+    return Number.isNaN(v.getTime()) ? null : v;
+  }
+
+  if (typeof v === 'number' && v > 20000 && v < 90000) {
+    const p = XLSX.SSF.parse_date_code(v);
+    if (!p) return null;
+    return new Date(p.y,p.m-1,p.d,p.H,p.M,p.S);
+  }
+
+  const s = String(v ?? '').trim();
+  if (!s) return null;
+
+  // dd/mm/yyyy, dd-mm-yyyy และรองรับปี พ.ศ.
+  const m = s.match(
+    /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})(?:[ T,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
+  );
+
+  if (m) {
+    let year = Number(m[3]);
+    if (year >= 2400) year -= 543;
+
+    const d = new Date(
+      year, Number(m[2])-1, Number(m[1]),
+      Number(m[4] || 0), Number(m[5] || 0),
+      Number(m[6] || 0)
+    );
+
+    if (d.getFullYear() !== year ||
+        d.getMonth() !== Number(m[2])-1 ||
+        d.getDate() !== Number(m[1])) return null;
+
+    return d;
+  }
+
+  // ISO: yyyy-mm-dd [hh:mm:ss]
+  const iso = s.match(
+    /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
+  );
+
+  if (iso) {
+    let year = Number(iso[1]);
+    if (year >= 2400) year -= 543;
+    const d = new Date(
+      year,Number(iso[2])-1,Number(iso[3]),
+      Number(iso[4]||0),Number(iso[5]||0),Number(iso[6]||0)
+    );
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function formatDate(d) {
+  if (!d) return 'ไม่ระบุเวลา';
+  return new Intl.DateTimeFormat('th-TH',{
+    year:'numeric',month:'2-digit',day:'2-digit',
+    hour:'2-digit',minute:'2-digit',second:'2-digit',
+    hourCycle:'h23'
+  }).format(d);
+}
+
+function dayKey(d) {
+  if (!d) return '';
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function esc(v) {
+  return String(v ?? '').replace(/[&<>"']/g,c=>({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  })[c]);
+}
+
+function colorFor(plate) {
+  let h = 0;
+  for (const c of String(plate)) h = (h*31+c.charCodeAt(0))|0;
+  return palette[Math.abs(h)%palette.length];
+}
+
+function initMap() {
+  map = L.map('map').setView([13.7563,100.5018],6);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    maxZoom:19,
+    attribution:'&copy; OpenStreetMap contributors'
+  }).addTo(map);
+  markers = L.layerGroup().addTo(map);
+  map.on('tileerror',()=>{
+    $('mapStatus').textContent =
+      'โหลดแผนที่ฐานไม่สำเร็จ โปรดตรวจสอบอินเทอร์เน็ต';
+  });
+}
+
+function showStatus(message) {
+  $('status').textContent = message;
+}
+
+$('file').addEventListener('change', async e => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  try {
+    showStatus('กำลังอ่านไฟล์...');
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer,{type:'array',cellDates:true});
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const data = XLSX.utils.sheet_to_json(sheet,{defval:'',raw:true});
+
+    if (!data.length) throw new Error('ไม่พบข้อมูลในชีตแรก');
+
+    processRows(data);
+    showStatus(`อ่านไฟล์ ${file.name} สำเร็จ จำนวน ${data.length.toLocaleString()} แถว`);
+  } catch (err) {
+    showStatus('เกิดข้อผิดพลาด: '+err.message);
+    alert('อ่านไฟล์ไม่ได้: '+err.message);
+  }
+});
+
+function processRows(data) {
+  const keys = Object.keys(data[0] || {});
+  const col = {
+    plate:findColumn(keys,['ทะเบียนรถ','เลขทะเบียน','ทะเบียน','license plate','plate']),
+    camera:findColumn(keys,['ชื่อจุดติดตั้งกล้อง','ชื่อกล้อง','จุดติดตั้ง','ชื่อจุด','camera name','camera','location']),
+    lat:findColumn(keys,['latitude','lat','ละติจูด']),
+    lon:findColumn(keys,['longitude','long','lon','ลองจิจูด']),
+    date:findColumn(keys,['วันเวลาที่ตรวจพบ','วันเวลาตรวจพบ','วันเวลา','วันที่เวลา','timestamp','datetime','date time','วัน-เวลา','วันที่','date']),
+    time:findColumn(keys,['เวลาที่ตรวจพบ','เวลาตรวจจับ','เวลา','time']),
+    count:findColumn(keys,['จำนวนครั้งที่ผ่าน','จำนวนครั้ง','passage count','count'])
+  };
+
+  if (!col.plate || !col.lat || !col.lon) {
+    alert('ไม่พบคอลัมน์ทะเบียนหรือพิกัด LAT/LONG\nหัวตารางที่อ่านได้:\n'+keys.join(', '));
+    return;
+  }
+
+  allRows = data.map((r,i)=>{
+    let rawDate = col.date ? r[col.date] : '';
+    let dt = parseDate(rawDate);
+
+    // หากวันที่และเวลาแยกคอลัมน์ ให้นำมาต่อกัน
+    if (col.time && r[col.time] !== '') {
+      const timeValue = r[col.time];
+      if (typeof timeValue === 'number' && timeValue >= 0 && timeValue < 1 && dt) {
+        const seconds = Math.round(timeValue*86400);
+        dt.setHours(0,0,0,0);
+        dt.setSeconds(seconds);
+      } else if (dt && !String(rawDate).match(/\d{1,2}:\d{2}/)) {
+        const t = String(timeValue).match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+        if (t) dt.setHours(+t[1],+t[2],+(t[3]||0));
+      }
+    }
+
+    let count = col.count ? Number(String(r[col.count]).replace(/,/g,'')) : 1;
+    if (!Number.isFinite(count) || count < 0) count = 1;
+
+    const lat = numberValue(r[col.lat]);
+    const lon = numberValue(r[col.lon]);
+
+    return {
+      id:i+1,
+      plate:String(r[col.plate] ?? '').trim() || 'ไม่ระบุทะเบียน',
+      camera:String((col.camera && r[col.camera]) || 'ไม่ระบุชื่อจุด').trim(),
+      lat,lon,date:dt,count,raw:r,
+      valid:Number.isFinite(lat) && Number.isFinite(lon) &&
+        lat>=-90 && lat<=90 && lon>=-180 && lon<=180
+    };
+  });
+
+  const valid = allRows.filter(r=>r.valid).length;
+  const timeCount = allRows.filter(r=>r.date).length;
+
+  $('fileInfo')?.remove();
+
+  const plates = [...new Set(allRows.map(r=>r.plate))].sort();
+  $('plate').innerHTML =
+    '<option value="">ทุกทะเบียน</option>'+
+    plates.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
+
+  showStatus(
+    `อ่านได้ ${allRows.length} แถว | พิกัดถูกต้อง ${valid} แถว | อ่านวันเวลาได้ ${timeCount} แถว`
+  );
+
+  applyFilters();
+}
+
+function applyFilters() {
+  const plate = $('plate').value;
+  const camera = $('camera').value.trim().toLowerCase();
+  const start = $('start').value;
+  const end = $('end').value;
+
+  filtered = allRows.filter(r =>
+    (!plate || r.plate === plate) &&
+    (!camera || r.camera.toLowerCase().includes(camera)) &&
+    (!start || (r.date && dayKey(r.date)>=start)) &&
+    (!end || (r.date && dayKey(r.date)<=end))
+  );
+
+  renderAll();
+}
+
+function summarizePoints(rows) {
+  const groups = new Map();
+
+  for (const r of rows) {
+    if (!r.valid) continue;
+
+    // รวมตามชื่อจุดและพิกัด ป้องกันรวมกล้องคนละจุดเข้าด้วยกัน
+    const key = `${r.camera}|${r.lat.toFixed(6)}|${r.lon.toFixed(6)}`;
+
+    if (!groups.has(key)) {
+      groups.set(key,{
+        camera:r.camera,lat:r.lat,lon:r.lon,
+        passes:0,plates:new Set(),latest:null,rows:0
+      });
+    }
+
+    const g = groups.get(key);
+    g.passes += r.count;
+    g.rows++;
+    g.plates.add(r.plate);
+
+    if (r.date && (!g.latest || r.date > g.latest)) g.latest = r.date;
+  }
+
+  return [...groups.values()].sort((a,b)=>b.passes-a.passes);
+}
+
+function renderAll() {
+  const plates = new Set(filtered.map(r=>r.plate));
+  const dates = filtered.map(r=>r.date).filter(Boolean).sort((a,b)=>b-a);
+  const validRows = filtered.filter(r=>r.valid);
+
+  $('kPlates').textContent = plates.size.toLocaleString();
+  $('kRows').textContent = filtered.length.toLocaleString();
+  $('kPass').textContent = filtered.reduce((s,r)=>s+r.count,0).toLocaleString();
+  $('kPoints').textContent = summarizePoints(filtered).length.toLocaleString();
+  $('kCoords').textContent = validRows.length.toLocaleString();
+  $('kLatest').textContent = dates.length ? formatDate(dates[0]) : '—';
+
+  renderMap();
+  renderFrequent();
+  renderRows();
+}
+
+function renderMap() {
+  markers.clearLayers();
+  const points = summarizePoints(filtered);
+  const bounds = [];
+
+  for (const r of filtered) {
+    if (!r.valid) continue;
+
+    const color = colorFor(r.plate);
+    const icon = L.divIcon({
+      className:'',
+      html:`<div class="car" style="background:${color}">🚘</div>`,
+      iconSize:[28,28],iconAnchor:[14,14]
+    });
+
+    const marker = L.marker([r.lat,r.lon],{icon});
+    marker.bindPopup(
+      `<b style="color:${color}">${esc(r.plate)}</b><br>`+
+      `จุด: ${esc(r.camera)}<br>`+
+      `วันเวลา: ${esc(formatDate(r.date))}<br>`+
+      `จำนวนครั้งในแถว: ${r.count}<br>`+
+      `พิกัด: ${r.lat}, ${r.lon}`
+    );
+    markers.addLayer(marker);
+    bounds.push([r.lat,r.lon]);
+  }
+
+  for (const p of points) {
+    const marker = L.circleMarker([p.lat,p.lon],{
+      radius:7,color:'#fff',weight:1,fillColor:'#f59e0b',fillOpacity:.95
+    });
+    marker.bindPopup(
+      `<b>📷 ${esc(p.camera)}</b><br>`+
+      `จำนวนครั้งรวม: ${p.passes}<br>`+
+      `จำนวนรายการ: ${p.rows}<br>`+
+      `ทะเบียนไม่ซ้ำ: ${p.plates.size}<br>`+
+      `พบล่าสุด: ${esc(formatDate(p.latest))}<br>`+
+      `พิกัด: ${p.lat}, ${p.lon}`
+    );
+    markers.addLayer(marker);
+  }
+
+  $('mapStatus').textContent =
+    `แสดงรายการรถ ${filtered.filter(r=>r.valid).length} รายการ และจุดตรวจจับ ${points.length} จุด`;
+
+  if (bounds.length) map.fitBounds(bounds,{padding:[25,25],maxZoom:15});
+}
+
+function renderFrequent() {
+  const points = summarizePoints(filtered);
+  $('frequent').innerHTML = points.length ? points.map(p=>
+    `<tr>
+      <td>${esc(p.camera)}</td>
+      <td>${p.passes.toLocaleString()}</td>
+      <td>${p.plates.size}</td>
+      <td>${esc(formatDate(p.latest))}</td>
+      <td>${p.lat}, ${p.lon}</td>
+    </tr>`
+  ).join('') : '<tr><td colspan="5">ไม่มีข้อมูลพิกัดที่ถูกต้อง</td></tr>';
+}
+
+function renderRows() {
+  $('tableStatus').textContent = `พบ ${filtered.length.toLocaleString()} รายการ`;
+  $('rows').innerHTML = filtered.slice(0,3000).map(r=>
+    `<tr>
+      <td>${esc(r.plate)}</td>
+      <td>${esc(r.camera)}</td>
+      <td>${esc(formatDate(r.date))}</td>
+      <td>${r.valid?r.lat:'—'}</td>
+      <td>${r.valid?r.lon:'—'}</td>
+      <td>${r.count}</td>
+    </tr>`
+  ).join('') || '<tr><td colspan="6">ไม่พบข้อมูล</td></tr>';
+
+  if (filtered.length>3000) {
+    $('rows').insertAdjacentHTML('beforeend',
+      `<tr><td colspan="6">แสดง 3,000 รายการแรกจาก ${filtered.length} รายการ กรุณาส่งออก CSV เพื่อดูทั้งหมด</td></tr>`
+    );
+  }
+}
+
+$('plate').addEventListener('change',applyFilters);
+$('camera').addEventListener('input',applyFilters);
+$('start').addEventListener('change',applyFilters);
+$('end').addEventListener('change',applyFilters);
+
+$('clear').addEventListener('click',()=>{
+  $('plate').value='';
+  $('camera').value='';
+  $('start').value='';
+  $('end').value='';
+  applyFilters();
+});
+
+$('fit').addEventListener('click',()=>{
+  const pts=filtered.filter(r=>r.valid).map(r=>[r.lat,r.lon]);
+  if (pts.length) map.fitBounds(pts,{padding:[25,25],maxZoom:15});
+});
+
+$('export').addEventListener('click',()=>{
+  if (!filtered.length) {
+    alert('ไม่มีข้อมูลให้ส่งออก');
+    return;
+  }
+
+  const header=['ทะเบียนรถ','ชื่อจุด','วันเวลา','LAT','LONG','จำนวนครั้ง'];
+  const rows=filtered.map(r=>[
+    r.plate,r.camera,formatDate(r.date),r.lat,r.lon,r.count
+  ]);
+
+  const csv='\uFEFF'+[header,...rows].map(row=>
+    row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')
+  ).join('\r\n');
+
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download='vehicle_passage_analysis.csv';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+});
+
+initMap();
+</script>
+</body>
+</html>
