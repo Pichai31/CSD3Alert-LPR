@@ -5,513 +5,682 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vehicle Passage Analysis Pro</title>
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
+:root{
+  --bg:#08101e; --panel:#0e1a2f; --panel2:#132341; --line:#1f3354;
+  --text:#e8eef8; --muted:#8fa4c0; --accent:#2dd4bf; --amber:#fbbf24; --red:#fb7185; --blue:#38bdf8;
+}
 *{box-sizing:border-box}
-body{margin:0;background:#07111f;color:#e5edf7;font-family:Arial,sans-serif}
-header,section{padding:16px;margin:12px}
-header{background:#0d1b2c;border-bottom:1px solid #1e5268}
-section{background:#0d1b2c;border:1px solid #20344a;border-radius:12px}
-h1,h2{color:#67e8f9}
-button,.btn{padding:10px 14px;background:#087e9b;color:white;border:0;border-radius:7px;cursor:pointer}
-input,select{padding:10px;background:#071321;color:white;border:1px solid #2a4057;border-radius:7px;max-width:100%}
-.controls{display:flex;gap:10px;flex-wrap:wrap}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
-.kpi{padding:12px;background:#071321;border-radius:8px}
-.kpi strong{display:block;font-size:23px;margin-top:6px}
-#map{height:460px;border-radius:10px}
-.tablewrap{overflow:auto;max-height:480px}
-table{width:100%;border-collapse:collapse;font-size:13px}
-td,th{padding:9px;border-bottom:1px solid #20344a;text-align:left;white-space:nowrap}
-th{color:#67e8f9;position:sticky;top:0;background:#0d1b2c}
-.muted{color:#9bb0c6;font-size:13px}
-footer{text-align:center;padding:20px;color:#9bb0c6}
-.car{width:28px;height:28px;border:2px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px}
-@media(max-width:600px){#map{height:350px}header,section{margin:8px;padding:12px}}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font-family:'Noto Sans Thai',Tahoma,Arial,sans-serif;font-size:14px;line-height:1.5}
+button,input,select{font-family:inherit;font-size:14px}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ---------- header ---------- */
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  padding:14px 20px;background:linear-gradient(180deg,#0f1f3a,#0b1629);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:12px}
+.brand-ico{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:22px;
+  background:linear-gradient(135deg,#0ea5a4,#2563eb)}
+.brand h1{margin:0;font-size:18px;font-weight:700;letter-spacing:.2px}
+.brand p{margin:0;color:var(--muted);font-size:12.5px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border-radius:9px;border:1px solid transparent;
+  background:var(--accent);color:#062a2a;font-weight:600}
+.btn:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent;color:var(--text);border-color:#2b4268}
+.btn.ghost:hover{background:var(--panel2)}
+#file{display:none}
+
+/* ---------- layout ---------- */
+.app{display:grid;gap:14px;padding:14px;max-width:1800px;margin:0 auto;
+  grid-template-columns:370px minmax(0,1fr);
+  grid-template-areas:"side map" "side table"}
+.side{grid-area:side;display:flex;flex-direction:column;gap:14px;min-width:0}
+.mapcard{grid-area:map}
+.tablecard{grid-area:table}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;min-width:0}
+.card h2{margin:0 0 10px;font-size:15px;font-weight:600}
+.muted{color:var(--muted);font-size:12.5px}
+
+/* ---------- filters ---------- */
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fgrid .full{grid-column:1/-1}
+label.f{display:flex;flex-direction:column;gap:4px;color:var(--muted);font-size:12.5px}
+input[type=text],input[type=date],select{width:100%;padding:9px 10px;background:#0a1426;color:var(--text);
+  border:1px solid #2a4066;border-radius:8px;color-scheme:dark}
+.chk{display:flex;align-items:center;gap:8px;color:var(--text);font-size:13px}
+.chk input{accent-color:var(--accent);width:16px;height:16px}
+
+/* ---------- kpis ---------- */
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.kpi{padding:11px 12px;background:#0a1426;border:1px solid var(--line);border-radius:10px}
+.kpi span{color:var(--muted);font-size:12px}
+.kpi strong{display:block;font-size:22px;font-weight:700;line-height:1.25}
+.kpi strong.sm{font-size:14px;line-height:1.35;padding-top:3px}
+
+/* ---------- hotspot list ---------- */
+.hslist{display:flex;flex-direction:column;gap:6px;max-height:340px;overflow:auto;padding-right:2px}
+.hs{display:flex;gap:10px;align-items:center;text-align:left;width:100%;padding:8px 10px;background:#0a1426;
+  border:1px solid var(--line);border-radius:10px;color:var(--text)}
+.hs:hover{border-color:var(--accent)}
+.hs-n{flex:0 0 34px;height:34px;border-radius:9px;display:grid;place-items:center;font-weight:700;color:#07101d}
+.hs-b{flex:1;min-width:0;display:block}
+.hs-b b{display:block;font-weight:500;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hs-b small{display:block;color:var(--muted);font-size:11.5px}
+.hs-b i{display:block;height:3px;border-radius:2px;margin-top:5px;opacity:.9}
+
+/* ---------- map ---------- */
+.maptools{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;justify-content:space-between;margin-bottom:10px}
+.seg{display:inline-flex;background:#0a1426;border:1px solid #2a4066;border-radius:10px;padding:3px}
+.seg button{border:0;background:transparent;color:var(--muted);padding:7px 12px;border-radius:7px;font-weight:500}
+.seg button.on{background:var(--accent);color:#062a2a;font-weight:600}
+.legend{display:flex;gap:12px;align-items:center;color:var(--muted);font-size:12px;flex-wrap:wrap}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend b{width:11px;height:11px;border-radius:50%;display:inline-block;border:1.5px solid #fff}
+#map{height:calc(100vh - 230px);min-height:520px;border-radius:12px;background:#0a1426;border:1px solid var(--line)}
+.leaflet-container{font-family:inherit}
+
+/* pin */
+.pin{background:none;border:0}
+.pin svg{display:block;filter:drop-shadow(0 3px 3px rgba(0,0,0,.55))}
+.arrow{background:none;border:0}
+
+/* popup + tooltip */
+.leaflet-popup-content-wrapper{background:var(--panel);color:var(--text);border:1px solid #2a4066;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+.leaflet-popup-tip{background:var(--panel)}
+.leaflet-popup-content{margin:14px 14px 12px;font-size:13px;line-height:1.5}
+.leaflet-container a.leaflet-popup-close-button{color:var(--muted)}
+.leaflet-tooltip{background:var(--panel);color:var(--text);border:1px solid #2a4066;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+.leaflet-tooltip-top:before{border-top-color:#2a4066}
+.pp-head{display:flex;gap:10px;align-items:center;margin-bottom:10px;padding-right:14px}
+.pp-badge{flex:0 0 46px;height:46px;border-radius:11px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#07101d;font-weight:700;line-height:1}
+.pp-badge em{font-style:normal;font-size:18px}
+.pp-badge small{font-size:10px;font-weight:600;margin-top:2px}
+.pp-head b{display:block;font-size:14px;line-height:1.35}
+.pp-head small{color:var(--muted);font-size:11.5px;font-variant-numeric:tabular-nums}
+.pp-sec{margin:10px 0 5px;color:var(--accent);font-weight:600;font-size:12px}
+.pp-cam{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--line)}
+.pp-cam span{min-width:0}
+.pp-cam small{display:block;color:var(--muted);font-size:11px}
+.pp-cam strong{white-space:nowrap;color:var(--amber)}
+.pp-scroll{max-height:190px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.pp-scroll table{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+.pp-scroll th,.pp-scroll td{padding:5px 8px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+.pp-scroll th{position:sticky;top:0;background:var(--panel2);color:var(--muted);font-weight:500}
+.pp-scroll td.cam{max-width:150px;overflow:hidden;text-overflow:ellipsis}
+
+/* ---------- table ---------- */
+.tablewrap{overflow:auto;max-height:440px;border:1px solid var(--line);border-radius:10px}
+table.main{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+table.main th,table.main td{padding:9px 12px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--line)}
+table.main th{position:sticky;top:0;background:var(--panel2);color:var(--muted);font-weight:500;z-index:1}
+table.main tbody tr{cursor:pointer}
+table.main tbody tr:hover{background:#12213b}
+table.main td.cam{max-width:360px;overflow:hidden;text-overflow:ellipsis}
+.tag{display:inline-block;min-width:26px;text-align:center;padding:1px 8px;border-radius:20px;font-weight:600;color:#07101d}
+
+footer{text-align:center;padding:22px;color:var(--muted);font-size:12.5px}
+
+/* ---------- responsive ---------- */
+@media(max-width:1000px){
+  .app{grid-template-columns:1fr;grid-template-areas:"map" "side" "table"}
+  #map{height:62vh;min-height:380px}
+}
+@media(max-width:600px){
+  .app{padding:8px;gap:10px}
+  .top{padding:12px}
+  .seg button{padding:7px 9px;font-size:13px}
+}
 </style>
 </head>
 
 <body>
-<header>
-  <h1>🚘 VEHICLE PASSAGE ANALYSIS PRO</h1>
-  <p>ระบบวิเคราะห์ข้อมูลการผ่านจุดตรวจจับรถยนต์</p>
-  <div class="controls">
-    <input id="file" type="file" accept=".xlsx,.xls,.csv">
-    <button id="export">ส่งออก CSV</button>
-    <button id="fit">แสดงทุกจุดบนแผนที่</button>
+<header class="top">
+  <div class="brand">
+    <div class="brand-ico">🚘</div>
+    <div>
+      <h1>Vehicle Passage Analysis Pro</h1>
+      <p>ระบบวิเคราะห์ข้อมูลการผ่านจุดตรวจจับรถยนต์</p>
+    </div>
   </div>
-  <p id="status" class="muted">กรุณาเลือกไฟล์ Excel หรือ CSV</p>
+  <div class="actions">
+    <label class="btn" for="file">📂 นำเข้าไฟล์ Excel / CSV</label>
+    <input id="file" type="file" accept=".xlsx,.xls,.csv">
+    <button class="btn ghost" id="export">⬇ ส่งออก CSV</button>
+  </div>
 </header>
 
-<section>
-  <h2>ตัวกรองข้อมูล</h2>
-  <div class="controls">
-    <label>ทะเบียนรถ<br><select id="plate"><option value="">ทุกทะเบียน</option></select></label>
-    <label>ค้นหาจุดกล้อง<br><input id="camera" placeholder="ชื่อกล้อง"></label>
-    <label>วันที่เริ่มต้น<br><input id="start" type="date"></label>
-    <label>วันที่สิ้นสุด<br><input id="end" type="date"></label>
-    <button id="clear">ล้างตัวกรอง</button>
-  </div>
-</section>
+<main class="app">
+  <!-- ===== ด้านข้าง ===== -->
+  <aside class="side">
+    <section class="card">
+      <h2>ตัวกรองข้อมูล</h2>
+      <div class="fgrid">
+        <label class="f full">ทะเบียนรถ
+          <select id="plate"><option value="">ทุกทะเบียน</option></select>
+        </label>
+        <label class="f full">ค้นหาชื่อกล้อง
+          <input id="camera" type="text" placeholder="เช่น บายพาสชลบุรี, หนองขาม">
+        </label>
+        <label class="f">วันที่เริ่มต้น<input id="start" type="date"></label>
+        <label class="f">วันที่สิ้นสุด<input id="end" type="date"></label>
+        <label class="chk full"><input type="checkbox" id="dedupe" checked> ตัดรายการซ้ำ (ทะเบียน/กล้อง/เวลาเดียวกัน)</label>
+        <button class="btn ghost full" id="clear" style="justify-content:center">ล้างตัวกรอง</button>
+      </div>
+      <p id="status" class="muted" style="margin:10px 0 0">กำลังโหลดข้อมูล…</p>
+    </section>
 
-<section class="kpis">
-  <div class="kpi">ทะเบียนไม่ซ้ำ<strong id="kPlates">0</strong></div>
-  <div class="kpi">รายการตรวจพบ<strong id="kRows">0</strong></div>
-  <div class="kpi">จำนวนครั้งที่ผ่าน<strong id="kPass">0</strong></div>
-  <div class="kpi">จุดตรวจจับ<strong id="kPoints">0</strong></div>
-  <div class="kpi">พิกัดถูกต้อง<strong id="kCoords">0</strong></div>
-  <div class="kpi">เวลาล่าสุด<strong id="kLatest" style="font-size:14px">—</strong></div>
-</section>
+    <section class="card">
+      <h2>สรุปภาพรวม</h2>
+      <div class="kpis">
+        <div class="kpi"><span>ผ่านจุดทั้งหมด (ครั้ง)</span><strong id="kRows">0</strong></div>
+        <div class="kpi"><span>จุดตรวจจับ (พิกัด)</span><strong id="kSpots">0</strong></div>
+        <div class="kpi"><span>ทะเบียนไม่ซ้ำ</span><strong id="kPlates">0</strong></div>
+        <div class="kpi"><span>พบล่าสุด (พ.ศ.)</span><strong class="sm" id="kLatest">—</strong></div>
+      </div>
+    </section>
 
-<section>
-  <h2>แผนที่จุดตรวจพบ</h2>
-  <p class="muted">คลิกหมุดเพื่อดูทะเบียน วันเวลา และจำนวนครั้งที่พบ ณ จุดนั้น</p>
-  <div id="map"></div>
-  <p id="mapStatus" class="muted"></p>
-</section>
+    <section class="card">
+      <h2>จุดที่ผ่านบ่อยที่สุด</h2>
+      <p class="muted" style="margin:-4px 0 10px">คลิกเพื่อซูมไปยังหมุดบนแผนที่</p>
+      <div id="hotspots" class="hslist"><p class="muted">ยังไม่มีข้อมูล</p></div>
+    </section>
+  </aside>
 
-<section>
-  <h2>จุดที่ผ่านบ่อยที่สุด</h2>
-  <div class="tablewrap">
-    <table>
-      <thead><tr>
-        <th>จุดตรวจจับ</th><th>จำนวนครั้ง</th>
-        <th>ทะเบียนไม่ซ้ำ</th><th>เวลาล่าสุด</th><th>พิกัด</th>
-      </tr></thead>
-      <tbody id="frequent"><tr><td colspan="5">ยังไม่มีข้อมูล</td></tr></tbody>
-    </table>
-  </div>
-</section>
+  <!-- ===== แผนที่ ===== -->
+  <section class="card mapcard" id="mapCard">
+    <div class="maptools">
+      <div class="seg" id="baseSeg" role="group" aria-label="ชนิดแผนที่">
+        <button data-base="road" class="on">🛣️ แผนที่เส้นทาง</button>
+        <button data-base="sat">🛰️ ดาวเทียม</button>
+        <button data-base="hybrid">🛰️ ดาวเทียม + ชื่อถนน</button>
+      </div>
+      <div class="legend">
+        <span><b style="background:#2dd4bf"></b>1 ครั้ง</span>
+        <span><b style="background:#fbbf24"></b>2–4 ครั้ง</span>
+        <span><b style="background:#fb7185"></b>5 ครั้งขึ้นไป</span>
+        <button class="btn ghost" id="fit" style="padding:6px 11px">ดูทุกจุด</button>
+      </div>
+    </div>
+    <div id="map"></div>
+    <p id="mapStatus" class="muted" style="margin:8px 0 0"></p>
+  </section>
 
-<section>
-  <h2>รายการตรวจพบทั้งหมด</h2>
-  <p id="tableStatus" class="muted"></p>
-  <div class="tablewrap">
-    <table>
-      <thead><tr>
-        <th>ทะเบียน</th><th>จุดตรวจจับ</th><th>วันเวลา</th>
-        <th>ละติจูด</th><th>ลองจิจูด</th><th>จำนวนครั้ง</th>
-      </tr></thead>
-      <tbody id="rows"><tr><td colspan="6">กรุณานำเข้าไฟล์</td></tr></tbody>
-    </table>
-  </div>
-</section>
+  <!-- ===== ตาราง ===== -->
+  <section class="card tablecard">
+    <h2>รายการตรวจพบทั้งหมด</h2>
+    <p id="tableStatus" class="muted" style="margin:-4px 0 10px"></p>
+    <div class="tablewrap">
+      <table class="main">
+        <thead><tr>
+          <th>ทะเบียน</th><th>จุดติดตั้งกล้อง</th><th>วันที่ (พ.ศ.)</th><th>เวลา</th>
+          <th>ละติจูด</th><th>ลองจิจูด</th><th>ผ่านจุดนี้รวม</th>
+        </tr></thead>
+        <tbody id="rows"><tr><td colspan="7">กรุณานำเข้าไฟล์</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</main>
 
 <footer>
   ฝ่ายวิเคราะห์ข้อมูล ชุดปฏิบัติการพิเศษ<br>
-  ผู้พัฒนาระบบ ส.ต.อ.พิชัย สมปัญญา
+  ผู้พัฒนา ยามเหงา
 </footer>
 
 <script>
 'use strict';
 
+/* ข้อมูลจากไฟล์ที่แนบ (แสดงอัตโนมัติเมื่อเปิดหน้า — นำเข้าไฟล์ใหม่เพื่อแทนที่ได้) */
+const EMBEDDED_NAME = 'รายงานข้อมูลรถ_04_11_2026.xlsx';
+const EMBEDDED = [{"ลำดับ": "1", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "2_ชบ_แยกท่าเรือ_เข้า_2, กองบัญชาการตำรวจปราบปรามยาเสพติด", "แหล่งข้อมูล": "กองบัญชาการตำรวจปราบปรามยาเสพติด", "วันที่": "2026/11/03", "เวลา": "19:46:15", "ละติจูด": "13.080321", "ลองจิจูด": "100.919178"}, {"ลำดับ": "2", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "2_ชบ_แยกท่าเรือ_ออก, กองบัญชาการตำรวจปราบปรามยาเสพติด", "แหล่งข้อมูล": "กองบัญชาการตำรวจปราบปรามยาเสพติด", "วันที่": "2026/11/03", "เวลา": "19:11:11", "ละติจูด": "13.080321", "ลองจิจูด": "100.919178"}, {"ลำดับ": "3", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "2_ปจ_หนองคล้า_ออก, กองบัญชาการตำรวจปราบปรามยาเสพติด", "แหล่งข้อมูล": "กองบัญชาการตำรวจปราบปรามยาเสพติด", "วันที่": "2026/10/27", "เวลา": "19:34:58", "ละติจูด": "13.903506", "ลองจิจูด": "101.637688"}, {"ลำดับ": "4", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "เขาคันทรง_ขาเข้า, กองบังคับการตำรวจทางหลวง", "แหล่งข้อมูล": "กองบังคับการตำรวจทางหลวง", "วันที่": "2026/10/27", "เวลา": "10:44:51", "ละติจูด": "13.122167", "ลองจิจูด": "101.162741"}, {"ลำดับ": "5", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "HW315 สี่แยกเกาะโพธิ์ มุ่งหน้าฉะเชิงเทรา, กองบังคับการตำรวจทางหลวง", "แหล่งข้อมูล": "กองบังคับการตำรวจทางหลวง", "วันที่": "2026/10/27", "เวลา": "10:06:23", "ละติจูด": "13.388177", "ลองจิจูด": "101.279644"}, {"ลำดับ": "6", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "หนองขาม 3_EN09, กรมทางหลวง", "แหล่งข้อมูล": "กรมทางหลวง", "วันที่": "2026/10/27", "เวลา": "07:45:03", "ละติจูด": "13.118657", "ลองจิจูด": "100.984454"}, {"ลำดับ": "7", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "พัทยา_EN02, กรมทางหลวง", "แหล่งข้อมูล": "กรมทางหลวง", "วันที่": "2026/10/18", "เวลา": "23:09:37", "ละติจูด": "12.949129", "ลองจิจูด": "100.936335"}, {"ลำดับ": "8", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "2_ชบ_สภ.ศรีราชา_ออก, กองบัญชาการตำรวจปราบปรามยาเสพติด", "แหล่งข้อมูล": "กองบัญชาการตำรวจปราบปรามยาเสพติด", "วันที่": "2026/10/01", "เวลา": "11:18:20", "ละติจูด": "13.171321", "ลองจิจูด": "100.931507"}, {"ลำดับ": "9", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "2_ชบ_แยกวัดวังหิน_ออก, กองบัญชาการตำรวจปราบปรามยาเสพติด", "แหล่งข้อมูล": "กองบัญชาการตำรวจปราบปรามยาเสพติด", "วันที่": "2026/10/01", "เวลา": "11:18:00", "ละติจูด": "13.172942", "ลองจิจูด": "100.931463"}, {"ลำดับ": "10", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "2_ชบ_แยกท่าเรือ_เข้า_2, กองบัญชาการตำรวจปราบปรามยาเสพติด", "แหล่งข้อมูล": "กองบัญชาการตำรวจปราบปรามยาเสพติด", "วันที่": "2026/10/01", "เวลา": "10:38:30", "ละติจูด": "13.080321", "ลองจิจูด": "100.919178"}, {"ลำดับ": "11", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "HW3 กม.120+400 แยกศรีราชาฮาเบอร์ มุ่งหน้า พัทยา, กองบังคับการตำรวจทางหลวง", "แหล่งข้อมูล": "กองบังคับการตำรวจทางหลวง", "วันที่": "2026/09/01", "เวลา": "11:36:55", "ละติจูด": "13.1483222", "ลองจิจูด": "100.9167256"}, {"ลำดับ": "12", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "พัทยา_EN03, กรมทางหลวง", "แหล่งข้อมูล": "กรมทางหลวง", "วันที่": "2026/08/29", "เวลา": "23:36:11", "ละติจูด": "12.949129", "ลองจิจูด": "100.936335"}, {"ลำดับ": "13", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "โป่ง 1_EX01, กรมทางหลวง", "แหล่งข้อมูล": "กรมทางหลวง", "วันที่": "2026/08/22", "เวลา": "17:02:57", "ละติจูด": "12.960367", "ลองจิจูด": "100.976272"}, {"ลำดับ": "14", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "พัทยา_EN03, กรมทางหลวง", "แหล่งข้อมูล": "กรมทางหลวง", "วันที่": "2026/08/22", "เวลา": "16:58:28", "ละติจูด": "12.949129", "ลองจิจูด": "100.936335"}, {"ลำดับ": "15", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "พัทยา_EX08, กรมทางหลวง", "แหล่งข้อมูล": "กรมทางหลวง", "วันที่": "2026/08/22", "เวลา": "16:39:44", "ละติจูด": "12.949129", "ลองจิจูด": "100.936335"}, {"ลำดับ": "16", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "โป่ง 4_EN06, กรมทางหลวง", "แหล่งข้อมูล": "กรมทางหลวง", "วันที่": "2026/08/22", "เวลา": "16:35:17", "ละติจูด": "12.957977", "ลองจิจูด": "100.975463"}, {"ลำดับ": "17", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "บายพาสชลบุรี_ขาออก, กองบังคับการตำรวจทางหลวง", "แหล่งข้อมูล": "กองบังคับการตำรวจทางหลวง", "วันที่": "2026/08/16", "เวลา": "20:28:46", "ละติจูด": "13.406224", "ลองจิจูด": "101.00184"}, {"ลำดับ": "18", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "7_สค_คลองครุ_ออก, กองบัญชาการตำรวจปราบปรามยาเสพติด", "แหล่งข้อมูล": "กองบัญชาการตำรวจปราบปรามยาเสพติด", "วันที่": "2026/08/16", "เวลา": "18:59:43", "ละติจูด": "13.572155", "ลองจิจูด": "100.272387"}, {"ลำดับ": "19", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "7_สค_อ้อมน้อยกิตติพร_ออก, กองบัญชาการตำรวจปราบปรามยาเสพติด", "แหล่งข้อมูล": "กองบัญชาการตำรวจปราบปรามยาเสพติด", "วันที่": "2026/08/16", "เวลา": "17:59:45", "ละติจูด": "13.70462", "ลองจิจูด": "100.31598"}, {"ลำดับ": "20", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "บายพาสชลบุรี_ขาเข้า, กองบังคับการตำรวจทางหลวง", "แหล่งข้อมูล": "กองบังคับการตำรวจทางหลวง", "วันที่": "2026/08/16", "เวลา": "16:27:34", "ละติจูด": "13.406195", "ลองจิจูด": "101.00168"}, {"ลำดับ": "21", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "บางพระ 1 (คีรี)_EX01, กรมทางหลวง", "แหล่งข้อมูล": "กรมทางหลวง", "วันที่": "2026/08/16", "เวลา": "16:09:26", "ละติจูด": "13.301761", "ลองจิจูด": "100.994997"}, {"ลำดับ": "22", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "หนองขาม 3_EN10, กรมทางหลวง", "แหล่งข้อมูล": "กรมทางหลวง", "วันที่": "2026/08/16", "เวลา": "15:54:47", "ละติจูด": "13.118657", "ลองจิจูด": "100.984454"}, {"ลำดับ": "23", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "บางพระ 2 (คีรี)_EN02, กรมทางหลวง", "แหล่งข้อมูล": "กรมทางหลวง", "วันที่": "2026/08/12", "เวลา": "20:23:02", "ละติจูด": "13.304238", "ลองจิจูด": "100.994008"}, {"ลำดับ": "24", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "บายพาสชลบุรี_ขาออก, กองบังคับการตำรวจทางหลวง", "แหล่งข้อมูล": "กองบังคับการตำรวจทางหลวง", "วันที่": "2026/08/12", "เวลา": "20:09:09", "ละติจูด": "13.406224", "ลองจิจูด": "101.00184"}, {"ลำดับ": "25", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "บายพาสชลบุรี_ขาเข้า, กองบังคับการตำรวจทางหลวง", "แหล่งข้อมูล": "กองบังคับการตำรวจทางหลวง", "วันที่": "2026/08/11", "เวลา": "17:05:43", "ละติจูด": "13.406195", "ลองจิจูด": "101.00168"}, {"ลำดับ": "26", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "บางพระ 1 (คีรี)_EX02, กรมทางหลวง", "แหล่งข้อมูล": "กรมทางหลวง", "วันที่": "2026/08/11", "เวลา": "16:18:34", "ละติจูด": "13.301761", "ลองจิจูด": "100.994997"}, {"ลำดับ": "27", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "หนองขาม 2_EN02, กรมทางหลวง", "แหล่งข้อมูล": "กรมทางหลวง", "วันที่": "2026/08/11", "เวลา": "16:01:33", "ละติจูด": "13.117755", "ลองจิจูด": "100.981944"}, {"ลำดับ": "28", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "บางพระ 2 (คีรี)_EN02, กรมทางหลวง", "แหล่งข้อมูล": "กรมทางหลวง", "วันที่": "2026/08/10", "เวลา": "21:39:36", "ละติจูด": "13.304238", "ลองจิจูด": "100.994008"}, {"ลำดับ": "29", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "บายพาสชลบุรี_ขาออก, กองบังคับการตำรวจทางหลวง", "แหล่งข้อมูล": "กองบังคับการตำรวจทางหลวง", "วันที่": "2026/08/10", "เวลา": "21:21:39", "ละติจูด": "13.406224", "ลองจิจูด": "101.00184"}, {"ลำดับ": "30", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "7_สค_คลองมะเดื่อ_ออก, กองบัญชาการตำรวจปราบปรามยาเสพติด", "แหล่งข้อมูล": "กองบัญชาการตำรวจปราบปรามยาเสพติด", "วันที่": "2026/08/10", "เวลา": "19:40:08", "ละติจูด": "13.624024", "ลองจิจูด": "100.292455"}, {"ลำดับ": "31", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "อมตะ_ขาเข้า, กองบังคับการตำรวจทางหลวง", "แหล่งข้อมูล": "กองบังคับการตำรวจทางหลวง", "วันที่": "2026/08/10", "เวลา": "08:42:53", "ละติจูด": "13.426067", "ลองจิจูด": "101.00164"}, {"ลำดับ": "32", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "อมตะ_ขาเข้า, กองบังคับการตำรวจทางหลวง", "แหล่งข้อมูล": "กองบังคับการตำรวจทางหลวง", "วันที่": "2026/08/10", "เวลา": "08:42:53", "ละติจูด": "13.426067", "ลองจิจูด": "101.00164"}, {"ลำดับ": "33", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "บายพาสชลบุรี_ขาเข้า, กองบังคับการตำรวจทางหลวง", "แหล่งข้อมูล": "กองบังคับการตำรวจทางหลวง", "วันที่": "2026/08/10", "เวลา": "08:40:25", "ละติจูด": "13.406195", "ลองจิจูด": "101.00168"}, {"ลำดับ": "34", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "บางพระ 1 (คีรี)_EX01, กรมทางหลวง", "แหล่งข้อมูล": "กรมทางหลวง", "วันที่": "2026/08/10", "เวลา": "08:27:42", "ละติจูด": "13.301761", "ลองจิจูด": "100.994997"}, {"ลำดับ": "35", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "หนองขาม 3_EN10, กรมทางหลวง", "แหล่งข้อมูล": "กรมทางหลวง", "วันที่": "2026/08/10", "เวลา": "08:13:30", "ละติจูด": "13.118657", "ลองจิจูด": "100.984454"}, {"ลำดับ": "36", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "บายพาสชลบุรี_ขาออก, กองบังคับการตำรวจทางหลวง", "แหล่งข้อมูล": "กองบังคับการตำรวจทางหลวง", "วันที่": "2026/08/09", "เวลา": "18:08:47", "ละติจูด": "13.406224", "ลองจิจูด": "101.00184"}, {"ลำดับ": "37", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "อมตะ_ขาออก, กองบังคับการตำรวจทางหลวง", "แหล่งข้อมูล": "กองบังคับการตำรวจทางหลวง", "วันที่": "2026/08/09", "เวลา": "18:06:24", "ละติจูด": "13.426444", "ลองจิจูด": "101.002167"}, {"ลำดับ": "38", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "บายพาสชลบุรี_ขาเข้า, กองบังคับการตำรวจทางหลวง", "แหล่งข้อมูล": "กองบังคับการตำรวจทางหลวง", "วันที่": "2026/08/09", "เวลา": "07:34:25", "ละติจูด": "13.406195", "ลองจิจูด": "101.00168"}, {"ลำดับ": "39", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "หนองขาม 2_EN02, กรมทางหลวง", "แหล่งข้อมูล": "กรมทางหลวง", "วันที่": "2026/08/09", "เวลา": "06:59:59", "ละติจูด": "13.117755", "ลองจิจูด": "100.981944"}, {"ลำดับ": "40", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "บางพระ 2 (คีรี)_EN04, กรมทางหลวง", "แหล่งข้อมูล": "กรมทางหลวง", "วันที่": "2026/08/05", "เวลา": "20:31:30", "ละติจูด": "13.304238", "ลองจิจูด": "100.994008"}, {"ลำดับ": "41", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "บายพาสชลบุรี_ขาออก, กองบังคับการตำรวจทางหลวง", "แหล่งข้อมูล": "กองบังคับการตำรวจทางหลวง", "วันที่": "2026/08/05", "เวลา": "20:20:54", "ละติจูด": "13.406224", "ลองจิจูด": "101.00184"}, {"ลำดับ": "42", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "ลาดกระบัง_EX05, กรมทางหลวง", "แหล่งข้อมูล": "กรมทางหลวง", "วันที่": "2026/08/05", "เวลา": "13:44:23", "ละติจูด": "13.670130", "ลองจิจูด": "100.844060"}, {"ลำดับ": "43", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "มอเตอร์เวย์ กม.44_ขาเข้า, กองบังคับการตำรวจทางหลวง", "แหล่งข้อมูล": "กองบังคับการตำรวจทางหลวง", "วันที่": "2026/08/05", "เวลา": "13:20:14", "ละติจูด": "13.576314", "ลองจิจูด": "100.977633"}, {"ลำดับ": "44", "ทะเบียนรถ": "จข 3702", "จังหวัด": "ชลบุรี", "จุดติดตั้งกล้อง": "หนองขาม 3_EN10, กรมทางหลวง", "แหล่งข้อมูล": "กรมทางหลวง", "วันที่": "2026/08/05", "เวลา": "12:43:59", "ละติจูด": "13.118657", "ลองจิจูด": "100.984454"}];
+
 const $ = id => document.getElementById(id);
-let allRows = [], filtered = [], map, markers;
+let allRows = [], view = [], spots = [], spotMap = new Map();
+let map, spotLayer, currentBase = 'road', tileWarned = false;
 
-const palette = [
-  '#22d3ee','#fb7185','#a78bfa','#fbbf24',
-  '#4ade80','#60a5fa','#f472b6','#fb923c',
-  '#2dd4bf','#c084fc','#f87171','#a3e635'
-];
+/* ---------------- แผนที่ฐาน ---------------- */
+const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services';
+const baseLayers = {
+  road: L.layerGroup([
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
+    })
+  ]),
+  sat: L.layerGroup([
+    L.tileLayer(ESRI + '/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 20, maxNativeZoom: 18, zIndex: 1, attribution: 'Imagery &copy; Esri, Maxar, Earthstar Geographics'
+    })
+  ]),
+  hybrid: L.layerGroup([
+    L.tileLayer(ESRI + '/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 20, maxNativeZoom: 18, zIndex: 1, attribution: 'Imagery &copy; Esri, Maxar, Earthstar Geographics'
+    }),
+    L.tileLayer(ESRI + '/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 20, maxNativeZoom: 18, zIndex: 2
+    }),
+    L.tileLayer(ESRI + '/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 20, maxNativeZoom: 18, zIndex: 3
+    })
+  ])
+};
 
-function normalize(s) {
-  return String(s ?? '').toLowerCase().replace(/[\s_-]/g,'').trim();
+function setBase(name) {
+  Object.values(baseLayers).forEach(l => map.removeLayer(l));
+  baseLayers[name].addTo(map);
+  currentBase = name;
+  document.querySelectorAll('#baseSeg button').forEach(b =>
+    b.classList.toggle('on', b.dataset.base === name));
 }
 
+function initMap() {
+  map = L.map('map', { maxZoom: 20, zoomSnap: 0.5 }).setView([13.2, 100.95], 9);
+  Object.values(baseLayers).forEach(g => g.eachLayer(t =>
+    t.on('tileerror', () => {
+      if (tileWarned) return;
+      tileWarned = true;
+      $('mapStatus').textContent = 'โหลดภาพแผนที่ไม่สำเร็จบางส่วน โปรดตรวจสอบการเชื่อมต่ออินเทอร์เน็ต';
+    })));
+  setBase('road');
+  spotLayer = L.layerGroup().addTo(map);
+  L.control.scale({ imperial: false }).addTo(map);
+}
+
+/* ---------------- ตัวช่วยทั่วไป ---------------- */
+const palette = ['#22d3ee','#fb7185','#a78bfa','#fbbf24','#4ade80','#60a5fa','#f472b6','#fb923c','#2dd4bf','#c084fc'];
+
+function normalize(s) { return String(s ?? '').toLowerCase().replace(/[\s_\-]/g, '').trim(); }
+
 function findColumn(keys, names) {
-  for (const name of names) {
-    const exact = keys.find(k => normalize(k) === normalize(name));
-    if (exact !== undefined) return exact;
+  for (const n of names) {
+    const hit = keys.find(k => normalize(k) === normalize(n));
+    if (hit !== undefined) return hit;
   }
-  for (const name of names) {
-    const found = keys.find(k => normalize(k).includes(normalize(name)));
-    if (found !== undefined) return found;
+  for (const n of names) {
+    const hit = keys.find(k => normalize(k).includes(normalize(n)));
+    if (hit !== undefined) return hit;
   }
   return '';
 }
 
-function numberValue(v) {
-  if (typeof v === 'number') return v;
-  let s = String(v ?? '').trim().replace(/,/g,'');
-  if (!s) return NaN;
-  // รองรับพิกัดที่มีเครื่องหมายทิศทาง
-  if (/^[\d.+-]+$/.test(s)) return Number(s);
-  return NaN;
+function esc(v) {
+  return String(v ?? '').replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
 
-function parseDate(v) {
-  if (v instanceof Date) {
-    return Number.isNaN(v.getTime()) ? null : v;
-  }
+function colorFor(key) {
+  let h = 0;
+  for (const c of String(key)) h = (h * 31 + c.charCodeAt(0)) | 0;
+  return palette[Math.abs(h) % palette.length];
+}
 
-  if (typeof v === 'number' && v > 20000 && v < 90000) {
+const hitColor = n => n >= 5 ? '#fb7185' : n >= 2 ? '#fbbf24' : '#2dd4bf';
+const p2 = n => String(n).padStart(2, '0');
+
+function fmtDate(d) { return d ? `${p2(d.getDate())}/${p2(d.getMonth() + 1)}/${d.getFullYear() + 543}` : '—'; }
+function fmtTime(d) { return d ? `${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}` : '—'; }
+function fmtFull(d) { return d ? `${fmtDate(d)} ${fmtTime(d)}` : '—'; }
+function dayKey(d) { return d ? `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}` : ''; }
+function isoLocal(d) { return d ? `${dayKey(d)}` : ''; }
+
+/* ---------------- แปลงค่าพิกัด / วันเวลา ---------------- */
+function toCoord(v) {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : NaN;
+  const s = String(v ?? '').trim().replace(/,/g, '');
+  const m = s.match(/-?\d+(?:\.\d+)?/);
+  if (!m) return NaN;
+  let n = parseFloat(m[0]);
+  if (/[SW]\s*$/i.test(s) && n > 0) n = -n;
+  return n;
+}
+
+function parseDateParts(v) {
+  if (v instanceof Date && !isNaN(v))
+    return { y: v.getFullYear(), m: v.getMonth() + 1, d: v.getDate(), H: v.getHours(), M: v.getMinutes(), S: v.getSeconds(), t: true };
+
+  if (typeof v === 'number' && v > 20000 && v < 100000) {
     const p = XLSX.SSF.parse_date_code(v);
     if (!p) return null;
-    return new Date(p.y,p.m-1,p.d,p.H,p.M,p.S);
+    return { y: p.y, m: p.m, d: p.d, H: p.H, M: p.M, S: Math.floor(p.S), t: v % 1 !== 0 };
   }
 
   const s = String(v ?? '').trim();
   if (!s) return null;
+  const tail = '(?:[ T,]+(\\d{1,2}):(\\d{2})(?::(\\d{2}))?)?';
+  let y, mo, d, H = 0, M = 0, S = 0, t = false, m;
 
-  // dd/mm/yyyy, dd-mm-yyyy และรองรับปี พ.ศ.
-  const m = s.match(
-    /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})(?:[ T,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
-  );
-
-  if (m) {
-    let year = Number(m[3]);
-    if (year >= 2400) year -= 543;
-
-    const d = new Date(
-      year, Number(m[2])-1, Number(m[1]),
-      Number(m[4] || 0), Number(m[5] || 0),
-      Number(m[6] || 0)
-    );
-
-    if (d.getFullYear() !== year ||
-        d.getMonth() !== Number(m[2])-1 ||
-        d.getDate() !== Number(m[1])) return null;
-
-    return d;
+  m = s.match(new RegExp('^(\\d{4})[/.\\-](\\d{1,2})[/.\\-](\\d{1,2})' + tail));
+  if (m) { y = +m[1]; mo = +m[2]; d = +m[3]; }
+  else {
+    m = s.match(new RegExp('^(\\d{1,2})[/.\\-](\\d{1,2})[/.\\-](\\d{4})' + tail));
+    if (!m) return null;
+    d = +m[1]; mo = +m[2]; y = +m[3];
   }
+  if (m[4] !== undefined) { t = true; H = +m[4]; M = +m[5]; S = +(m[6] || 0); }
+  if (y >= 2400) y -= 543;                      // รองรับปี พ.ศ.
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  return { y, m: mo, d, H, M, S, t };
+}
 
-  // ISO: yyyy-mm-dd [hh:mm:ss]
-  const iso = s.match(
-    /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
-  );
-
-  if (iso) {
-    let year = Number(iso[1]);
-    if (year >= 2400) year -= 543;
-    const d = new Date(
-      year,Number(iso[2])-1,Number(iso[3]),
-      Number(iso[4]||0),Number(iso[5]||0),Number(iso[6]||0)
-    );
-    return Number.isNaN(d.getTime()) ? null : d;
+function parseTimeParts(v) {
+  if (typeof v === 'number' && v >= 0) {
+    const sec = Math.round((v % 1) * 86400);
+    return { H: Math.floor(sec / 3600) % 24, M: Math.floor((sec % 3600) / 60), S: sec % 60 };
   }
-
-  const d = new Date(s);
-  return Number.isNaN(d.getTime()) ? null : d;
+  if (v instanceof Date && !isNaN(v)) return { H: v.getHours(), M: v.getMinutes(), S: v.getSeconds() };
+  const m = String(v ?? '').match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  return m ? { H: +m[1], M: +m[2], S: +(m[3] || 0) } : null;
 }
 
-function formatDate(d) {
-  if (!d) return 'ไม่ระบุเวลา';
-  return new Intl.DateTimeFormat('th-TH',{
-    year:'numeric',month:'2-digit',day:'2-digit',
-    hour:'2-digit',minute:'2-digit',second:'2-digit',
-    hourCycle:'h23'
-  }).format(d);
+function buildDate(dv, tv) {
+  const dp = parseDateParts(dv);
+  if (!dp) return null;
+  let { H, M, S } = dp;
+  if (!dp.t) {
+    const tp = parseTimeParts(tv);
+    if (tp) { H = tp.H; M = tp.M; S = tp.S; }
+  }
+  const dt = new Date(dp.y, dp.m - 1, dp.d, H, M, S);
+  return isNaN(dt) ? null : dt;
 }
 
-function dayKey(d) {
-  if (!d) return '';
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-
-function esc(v) {
-  return String(v ?? '').replace(/[&<>"']/g,c=>({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-  })[c]);
-}
-
-function colorFor(plate) {
-  let h = 0;
-  for (const c of String(plate)) h = (h*31+c.charCodeAt(0))|0;
-  return palette[Math.abs(h)%palette.length];
-}
-
-function initMap() {
-  map = L.map('map').setView([13.7563,100.5018],6);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-    maxZoom:19,
-    attribution:'&copy; OpenStreetMap contributors'
-  }).addTo(map);
-  markers = L.layerGroup().addTo(map);
-  map.on('tileerror',()=>{
-    $('mapStatus').textContent =
-      'โหลดแผนที่ฐานไม่สำเร็จ โปรดตรวจสอบอินเทอร์เน็ต';
-  });
-}
-
-function showStatus(message) {
-  $('status').textContent = message;
-}
-
+/* ---------------- นำเข้าไฟล์ ---------------- */
 $('file').addEventListener('change', async e => {
   const file = e.target.files?.[0];
   if (!file) return;
-
   try {
-    showStatus('กำลังอ่านไฟล์...');
-    const buffer = await file.arrayBuffer();
-    const workbook = XLSX.read(buffer,{type:'array',cellDates:true});
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const data = XLSX.utils.sheet_to_json(sheet,{defval:'',raw:true});
-
+    $('status').textContent = 'กำลังอ่านไฟล์…';
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const data = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: true });
     if (!data.length) throw new Error('ไม่พบข้อมูลในชีตแรก');
-
-    processRows(data);
-    showStatus(`อ่านไฟล์ ${file.name} สำเร็จ จำนวน ${data.length.toLocaleString()} แถว`);
+    processRows(data, file.name);
   } catch (err) {
-    showStatus('เกิดข้อผิดพลาด: '+err.message);
-    alert('อ่านไฟล์ไม่ได้: '+err.message);
+    $('status').textContent = 'เกิดข้อผิดพลาด: ' + err.message;
+    alert('อ่านไฟล์ไม่ได้: ' + err.message);
   }
+  e.target.value = '';
 });
 
-function processRows(data) {
+function processRows(data, name) {
   const keys = Object.keys(data[0] || {});
   const col = {
-    plate:findColumn(keys,['ทะเบียนรถ','เลขทะเบียน','ทะเบียน','license plate','plate']),
-    camera:findColumn(keys,['ชื่อจุดติดตั้งกล้อง','ชื่อกล้อง','จุดติดตั้ง','ชื่อจุด','camera name','camera','location']),
-    lat:findColumn(keys,['latitude','lat','ละติจูด']),
-    lon:findColumn(keys,['longitude','long','lon','ลองจิจูด']),
-    date:findColumn(keys,['วันเวลาที่ตรวจพบ','วันเวลาตรวจพบ','วันเวลา','วันที่เวลา','timestamp','datetime','date time','วัน-เวลา','วันที่','date']),
-    time:findColumn(keys,['เวลาที่ตรวจพบ','เวลาตรวจจับ','เวลา','time']),
-    count:findColumn(keys,['จำนวนครั้งที่ผ่าน','จำนวนครั้ง','passage count','count'])
+    plate: findColumn(keys, ['ทะเบียนรถ', 'เลขทะเบียน', 'ทะเบียน', 'license plate', 'plate']),
+    prov: findColumn(keys, ['จังหวัด', 'province']),
+    camera: findColumn(keys, ['จุดติดตั้งกล้อง', 'ชื่อจุดติดตั้งกล้อง', 'ชื่อกล้อง', 'จุดติดตั้ง', 'ชื่อจุด', 'camera name', 'camera', 'location']),
+    source: findColumn(keys, ['แหล่งข้อมูล', 'หน่วยงาน', 'source']),
+    date: findColumn(keys, ['วันเวลาที่ตรวจพบ', 'วันเวลาตรวจพบ', 'วันเวลา', 'timestamp', 'datetime', 'วันที่', 'date']),
+    time: findColumn(keys, ['เวลา', 'เวลาที่ตรวจพบ', 'time']),
+    lat: findColumn(keys, ['ละติจูด', 'latitude', 'lat']),
+    lon: findColumn(keys, ['ลองจิจูด', 'longitude', 'long', 'lon'])
   };
+  if (col.time && col.time === col.date) col.time = '';
 
   if (!col.plate || !col.lat || !col.lon) {
-    alert('ไม่พบคอลัมน์ทะเบียนหรือพิกัด LAT/LONG\nหัวตารางที่อ่านได้:\n'+keys.join(', '));
+    alert('ไม่พบคอลัมน์ทะเบียน หรือ ละติจูด/ลองจิจูด\nหัวตารางที่อ่านได้:\n' + keys.join(', '));
     return;
   }
 
-  allRows = data.map((r,i)=>{
-    let rawDate = col.date ? r[col.date] : '';
-    let dt = parseDate(rawDate);
+  const seen = new Set();
+  let swapped = 0;
 
-    // หากวันที่และเวลาแยกคอลัมน์ ให้นำมาต่อกัน
-    if (col.time && r[col.time] !== '') {
-      const timeValue = r[col.time];
-      if (typeof timeValue === 'number' && timeValue >= 0 && timeValue < 1 && dt) {
-        const seconds = Math.round(timeValue*86400);
-        dt.setHours(0,0,0,0);
-        dt.setSeconds(seconds);
-      } else if (dt && !String(rawDate).match(/\d{1,2}:\d{2}/)) {
-        const t = String(timeValue).match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
-        if (t) dt.setHours(+t[1],+t[2],+(t[3]||0));
-      }
-    }
+  allRows = data.map((r, i) => {
+    let lat = toCoord(r[col.lat]), lon = toCoord(r[col.lon]);
+    if (Math.abs(lat) > 90 && Math.abs(lon) <= 90) { [lat, lon] = [lon, lat]; swapped++; }  // สลับ lat/long ที่ใส่กลับกัน
+    const valid = Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180 && !(lat === 0 && lon === 0);
 
-    let count = col.count ? Number(String(r[col.count]).replace(/,/g,'')) : 1;
-    if (!Number.isFinite(count) || count < 0) count = 1;
+    const full = String((col.camera && r[col.camera]) || 'ไม่ระบุชื่อจุด').trim();
+    const cut = full.lastIndexOf(',');
+    const camName = cut > 0 ? full.slice(0, cut).trim() : full;
+    const agency = String((col.source && r[col.source]) || (cut > 0 ? full.slice(cut + 1) : '')).trim();
 
-    const lat = numberValue(r[col.lat]);
-    const lon = numberValue(r[col.lon]);
+    const date = buildDate(col.date ? r[col.date] : '', col.time ? r[col.time] : '');
+    const plate = String(r[col.plate] ?? '').trim() || 'ไม่ระบุทะเบียน';
+
+    const dupKey = [plate, full, date ? date.getTime() : String(r[col.date]) + String(r[col.time]), lat, lon].join('|');
+    const isDup = seen.has(dupKey);
+    seen.add(dupKey);
 
     return {
-      id:i+1,
-      plate:String(r[col.plate] ?? '').trim() || 'ไม่ระบุทะเบียน',
-      camera:String((col.camera && r[col.camera]) || 'ไม่ระบุชื่อจุด').trim(),
-      lat,lon,date:dt,count,raw:r,
-      valid:Number.isFinite(lat) && Number.isFinite(lon) &&
-        lat>=-90 && lat<=90 && lon>=-180 && lon<=180
+      id: i + 1, plate, province: String((col.prov && r[col.prov]) || '').trim(),
+      camera: camName, cameraFull: full, agency, date, lat, lon, valid, isDup,
+      key: valid ? `${lat}|${lon}` : ''
     };
   });
 
-  const valid = allRows.filter(r=>r.valid).length;
-  const timeCount = allRows.filter(r=>r.date).length;
+  const plates = [...new Set(allRows.map(r => r.plate))].sort();
+  $('plate').innerHTML = '<option value="">ทุกทะเบียน</option>' +
+    plates.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('');
 
-  $('fileInfo')?.remove();
-
-  const plates = [...new Set(allRows.map(r=>r.plate))].sort();
-  $('plate').innerHTML =
-    '<option value="">ทุกทะเบียน</option>'+
-    plates.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
-
-  showStatus(
-    `อ่านได้ ${allRows.length} แถว | พิกัดถูกต้อง ${valid} แถว | อ่านวันเวลาได้ ${timeCount} แถว`
-  );
-
-  applyFilters();
+  const nValid = allRows.filter(r => r.valid).length;
+  const nTime = allRows.filter(r => r.date).length;
+  const nDup = allRows.filter(r => r.isDup).length;
+  $('status').textContent =
+    `${name} — ${allRows.length} แถว | พิกัดถูกต้อง ${nValid} | อ่านวันเวลาได้ ${nTime} | ซ้ำ ${nDup}` +
+    (swapped ? ` | สลับ lat/long ให้อัตโนมัติ ${swapped} แถว` : '');
+  applyFilters(true);
 }
 
-function applyFilters() {
+/* ---------------- กรองข้อมูล ---------------- */
+function applyFilters(fit = true) {
   const plate = $('plate').value;
-  const camera = $('camera').value.trim().toLowerCase();
-  const start = $('start').value;
-  const end = $('end').value;
+  const cam = $('camera').value.trim().toLowerCase();
+  const start = $('start').value, end = $('end').value;
+  const dedupe = $('dedupe').checked;
 
-  filtered = allRows.filter(r =>
+  view = allRows.filter(r =>
     (!plate || r.plate === plate) &&
-    (!camera || r.camera.toLowerCase().includes(camera)) &&
-    (!start || (r.date && dayKey(r.date)>=start)) &&
-    (!end || (r.date && dayKey(r.date)<=end))
+    (!cam || r.cameraFull.toLowerCase().includes(cam)) &&
+    (!start || (r.date && dayKey(r.date) >= start)) &&
+    (!end || (r.date && dayKey(r.date) <= end)) &&
+    (!dedupe || !r.isDup)
   );
-
-  renderAll();
+  renderAll(fit);
 }
 
-function summarizePoints(rows) {
-  const groups = new Map();
-
+/* ---------------- สรุปเป็นจุด (รวมตามพิกัดจริง ไม่ปัดเศษ) ---------------- */
+function buildSpots(rows) {
+  const g = new Map();
   for (const r of rows) {
     if (!r.valid) continue;
-
-    // รวมตามชื่อจุดและพิกัด ป้องกันรวมกล้องคนละจุดเข้าด้วยกัน
-    const key = `${r.camera}|${r.lat.toFixed(6)}|${r.lon.toFixed(6)}`;
-
-    if (!groups.has(key)) {
-      groups.set(key,{
-        camera:r.camera,lat:r.lat,lon:r.lon,
-        passes:0,plates:new Set(),latest:null,rows:0
-      });
-    }
-
-    const g = groups.get(key);
-    g.passes += r.count;
-    g.rows++;
-    g.plates.add(r.plate);
-
-    if (r.date && (!g.latest || r.date > g.latest)) g.latest = r.date;
+    if (!g.has(r.key)) g.set(r.key, { key: r.key, lat: r.lat, lon: r.lon, rows: [], cams: new Map(), plates: new Set(), latest: null, marker: null });
+    const s = g.get(r.key);
+    s.rows.push(r);
+    s.plates.add(r.plate);
+    if (r.date && (!s.latest || r.date > s.latest)) s.latest = r.date;
+    if (!s.cams.has(r.camera)) s.cams.set(r.camera, { count: 0, agency: r.agency });
+    s.cams.get(r.camera).count++;
   }
-
-  return [...groups.values()].sort((a,b)=>b.passes-a.passes);
+  const list = [...g.values()];
+  for (const s of list) {
+    s.rows.sort((a, b) => (b.date || 0) - (a.date || 0));
+    s.hits = s.rows.length;
+    const top = [...s.cams.entries()].sort((a, b) => b[1].count - a[1].count);
+    s.title = top[0][0] + (top.length > 1 ? ` (+${top.length - 1} กล้อง)` : '');
+  }
+  return list.sort((a, b) => b.hits - a.hits || (b.latest || 0) - (a.latest || 0));
 }
 
-function renderAll() {
-  const plates = new Set(filtered.map(r=>r.plate));
-  const dates = filtered.map(r=>r.date).filter(Boolean).sort((a,b)=>b-a);
-  const validRows = filtered.filter(r=>r.valid);
+/* ---------------- วาดผลลัพธ์ ---------------- */
+function renderAll(fit = true) {
+  spots = buildSpots(view);
+  spotMap = new Map(spots.map(s => [s.key, s]));
+  const dates = view.map(r => r.date).filter(Boolean).sort((a, b) => b - a);
 
-  $('kPlates').textContent = plates.size.toLocaleString();
-  $('kRows').textContent = filtered.length.toLocaleString();
-  $('kPass').textContent = filtered.reduce((s,r)=>s+r.count,0).toLocaleString();
-  $('kPoints').textContent = summarizePoints(filtered).length.toLocaleString();
-  $('kCoords').textContent = validRows.length.toLocaleString();
-  $('kLatest').textContent = dates.length ? formatDate(dates[0]) : '—';
+  $('kRows').textContent = view.length.toLocaleString();
+  $('kSpots').textContent = spots.length.toLocaleString();
+  $('kPlates').textContent = new Set(view.map(r => r.plate)).size.toLocaleString();
+  $('kLatest').innerHTML = dates.length ? `${fmtDate(dates[0])}<br>${fmtTime(dates[0])}` : '—';
 
-  renderMap();
-  renderFrequent();
+  renderMap(fit);
+  renderHotspots();
   renderRows();
 }
 
-function renderMap() {
-  markers.clearLayers();
-  const points = summarizePoints(filtered);
-  const bounds = [];
-
-  for (const r of filtered) {
-    if (!r.valid) continue;
-
-    const color = colorFor(r.plate);
-    const icon = L.divIcon({
-      className:'',
-      html:`<div class="car" style="background:${color}">🚘</div>`,
-      iconSize:[28,28],iconAnchor:[14,14]
-    });
-
-    const marker = L.marker([r.lat,r.lon],{icon});
-    marker.bindPopup(
-      `<b style="color:${color}">${esc(r.plate)}</b><br>`+
-      `จุด: ${esc(r.camera)}<br>`+
-      `วันเวลา: ${esc(formatDate(r.date))}<br>`+
-      `จำนวนครั้งในแถว: ${r.count}<br>`+
-      `พิกัด: ${r.lat}, ${r.lon}`
-    );
-    markers.addLayer(marker);
-    bounds.push([r.lat,r.lon]);
-  }
-
-  for (const p of points) {
-    const marker = L.circleMarker([p.lat,p.lon],{
-      radius:7,color:'#fff',weight:1,fillColor:'#f59e0b',fillOpacity:.95
-    });
-    marker.bindPopup(
-      `<b>📷 ${esc(p.camera)}</b><br>`+
-      `จำนวนครั้งรวม: ${p.passes}<br>`+
-      `จำนวนรายการ: ${p.rows}<br>`+
-      `ทะเบียนไม่ซ้ำ: ${p.plates.size}<br>`+
-      `พบล่าสุด: ${esc(formatDate(p.latest))}<br>`+
-      `พิกัด: ${p.lat}, ${p.lon}`
-    );
-    markers.addLayer(marker);
-  }
-
-  $('mapStatus').textContent =
-    `แสดงรายการรถ ${filtered.filter(r=>r.valid).length} รายการ และจุดตรวจจับ ${points.length} จุด`;
-
-  if (bounds.length) map.fitBounds(bounds,{padding:[25,25],maxZoom:15});
+function pinIcon(n, color) {
+  const label = n > 99 ? '99+' : n;
+  return L.divIcon({
+    className: 'pin', iconSize: [36, 46],
+    iconAnchor: [18, 45],            // ปลายหมุดอยู่ที่ตำแหน่ง lat/long จริงพอดี
+    popupAnchor: [0, -42], tooltipAnchor: [0, -40],
+    html: `<svg viewBox="0 0 36 46" width="36" height="46" aria-hidden="true">
+      <path d="M18 45C18 45 3 28.5 3 17.5a15 15 0 0 1 30 0C33 28.5 18 45 18 45z" fill="${color}" stroke="#fff" stroke-width="2.2"/>
+      <circle cx="18" cy="17.5" r="10" fill="rgba(6,12,24,.9)"/>
+      <text x="18" y="21.8" text-anchor="middle" font-size="${String(label).length > 2 ? 10 : 12.5}" font-weight="700" fill="#fff" font-family="Arial,sans-serif">${label}</text>
+    </svg>`
+  });
 }
 
-function renderFrequent() {
-  const points = summarizePoints(filtered);
-  $('frequent').innerHTML = points.length ? points.map(p=>
-    `<tr>
-      <td>${esc(p.camera)}</td>
-      <td>${p.passes.toLocaleString()}</td>
-      <td>${p.plates.size}</td>
-      <td>${esc(formatDate(p.latest))}</td>
-      <td>${p.lat}, ${p.lon}</td>
-    </tr>`
-  ).join('') : '<tr><td colspan="5">ไม่มีข้อมูลพิกัดที่ถูกต้อง</td></tr>';
+function popupHtml(s) {
+  const color = hitColor(s.hits);
+  const multiPlate = s.plates.size > 1;
+  const cams = [...s.cams.entries()].sort((a, b) => b[1].count - a[1].count);
+
+  const camRows = cams.map(([name, c]) =>
+    `<div class="pp-cam"><span>${esc(name)}${c.agency ? `<small>${esc(c.agency)}</small>` : ''}</span><strong>${c.count} ครั้ง</strong></div>`
+  ).join('');
+
+  const logRows = s.rows.map(r =>
+    `<tr><td>${fmtDate(r.date)}</td><td>${fmtTime(r.date)}</td><td class="cam" title="${esc(r.camera)}">${esc(r.camera)}</td>${multiPlate ? `<td>${esc(r.plate)}</td>` : ''}</tr>`
+  ).join('');
+
+  return `<div class="pp">
+    <div class="pp-head">
+      <div class="pp-badge" style="background:${color}"><em>${s.hits}</em><small>ครั้ง</small></div>
+      <div><b>${esc(s.title)}</b><small>${s.lat}, ${s.lon}</small></div>
+    </div>
+    <div class="pp-sec">กล้องที่จุดนี้ (${cams.length})</div>
+    ${camRows}
+    <div class="pp-sec">ประวัติการผ่าน — ${s.hits} ครั้ง${s.plates.size ? ` · ${s.plates.size} ทะเบียน` : ''}</div>
+    <div class="pp-scroll"><table>
+      <thead><tr><th>วันที่ (พ.ศ.)</th><th>เวลา</th><th>กล้อง</th>${multiPlate ? '<th>ทะเบียน</th>' : ''}</tr></thead>
+      <tbody>${logRows}</tbody>
+    </table></div>
+  </div>`;
+}
+
+function renderMap(fit) {
+  spotLayer.clearLayers();
+
+  for (const s of spots) {
+    const color = hitColor(s.hits);
+    // จุดวงกลมเล็กที่พิกัดจริง เพื่อตรวจสอบตำแหน่ง
+    L.circleMarker([s.lat, s.lon], { radius: 3, color: '#fff', weight: 1.5, fillColor: '#0a1426', fillOpacity: 1, interactive: false }).addTo(spotLayer);
+
+    const m = L.marker([s.lat, s.lon], { icon: pinIcon(s.hits, color), zIndexOffset: 1000 + s.hits });
+    m.bindPopup(() => popupHtml(s), { maxWidth: 400, minWidth: 310, autoPanPadding: [30, 30] });
+    m.bindTooltip(`${esc(s.title)} — ${s.hits} ครั้ง`, { direction: 'top' });
+    m.addTo(spotLayer);
+    s.marker = m;
+  }
+
+  const nValid = view.filter(r => r.valid).length;
+  const bad = view.length - nValid;
+  $('mapStatus').textContent =
+    `แสดง ${spots.length} จุดตรวจจับ จาก ${nValid} รายการ` + (bad ? ` | ไม่มีพิกัดที่ใช้ได้ ${bad} รายการ` : '') +
+    ' | ปลายหมุดตรงกับพิกัดละติจูด/ลองจิจูดในไฟล์';
+
+  if (fit) fitAll();
+}
+
+function fitAll() {
+  if (!spots.length) return;
+  const b = L.latLngBounds(spots.map(s => [s.lat, s.lon]));
+  map.fitBounds(b, { padding: [60, 60], maxZoom: 16 });
+}
+
+/* ---------------- รายการด้านข้าง / ตาราง ---------------- */
+function focusSpot(key) {
+  const s = spotMap.get(key);
+  if (!s) return;
+  if (window.innerWidth <= 1000) $('mapCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  map.flyTo([s.lat, s.lon], Math.max(map.getZoom(), 17), { duration: .8 });
+  setTimeout(() => s.marker && s.marker.openPopup(), 900);
+}
+
+function renderHotspots() {
+  const max = spots.length ? spots[0].hits : 1;
+  $('hotspots').innerHTML = spots.length ? spots.map(s => {
+    const c = hitColor(s.hits);
+    return `<button class="hs" data-key="${esc(s.key)}">
+      <span class="hs-n" style="background:${c}">${s.hits}</span>
+      <span class="hs-b"><b>${esc(s.title)}</b>
+        <small>ล่าสุด ${fmtFull(s.latest)}</small>
+        <i style="width:${Math.max(6, s.hits / max * 100)}%;background:${c}"></i></span>
+    </button>`;
+  }).join('') : '<p class="muted">ไม่มีข้อมูลพิกัดที่ใช้ได้</p>';
 }
 
 function renderRows() {
-  $('tableStatus').textContent = `พบ ${filtered.length.toLocaleString()} รายการ`;
-  $('rows').innerHTML = filtered.slice(0,3000).map(r=>
-    `<tr>
+  const rows = [...view].sort((a, b) => (b.date || 0) - (a.date || 0));
+  $('tableStatus').textContent = `พบ ${rows.length.toLocaleString()} รายการ — คลิกแถวเพื่อซูมไปยังหมุด`;
+  const html = rows.slice(0, 3000).map(r => {
+    const hits = r.valid && spotMap.get(r.key) ? spotMap.get(r.key).hits : 0;
+    return `<tr data-key="${esc(r.key)}">
       <td>${esc(r.plate)}</td>
-      <td>${esc(r.camera)}</td>
-      <td>${esc(formatDate(r.date))}</td>
-      <td>${r.valid?r.lat:'—'}</td>
-      <td>${r.valid?r.lon:'—'}</td>
-      <td>${r.count}</td>
-    </tr>`
-  ).join('') || '<tr><td colspan="6">ไม่พบข้อมูล</td></tr>';
-
-  if (filtered.length>3000) {
-    $('rows').insertAdjacentHTML('beforeend',
-      `<tr><td colspan="6">แสดง 3,000 รายการแรกจาก ${filtered.length} รายการ กรุณาส่งออก CSV เพื่อดูทั้งหมด</td></tr>`
-    );
-  }
+      <td class="cam" title="${esc(r.cameraFull)}">${esc(r.camera)}</td>
+      <td>${fmtDate(r.date)}</td><td>${fmtTime(r.date)}</td>
+      <td>${r.valid ? r.lat : '—'}</td><td>${r.valid ? r.lon : '—'}</td>
+      <td>${hits ? `<span class="tag" style="background:${hitColor(hits)}">${hits}</span>` : '—'}</td>
+    </tr>`;
+  }).join('');
+  $('rows').innerHTML = html || '<tr><td colspan="7">ไม่พบข้อมูล</td></tr>';
+  if (rows.length > 3000)
+    $('rows').insertAdjacentHTML('beforeend', `<tr><td colspan="7">แสดง 3,000 รายการแรกจาก ${rows.length.toLocaleString()} รายการ — ส่งออก CSV เพื่อดูทั้งหมด</td></tr>`);
 }
 
-$('plate').addEventListener('change',applyFilters);
-$('camera').addEventListener('input',applyFilters);
-$('start').addEventListener('change',applyFilters);
-$('end').addEventListener('change',applyFilters);
-
-$('clear').addEventListener('click',()=>{
-  $('plate').value='';
-  $('camera').value='';
-  $('start').value='';
-  $('end').value='';
-  applyFilters();
+/* ---------------- Events ---------------- */
+$('hotspots').addEventListener('click', e => {
+  const b = e.target.closest('.hs');
+  if (b) focusSpot(b.dataset.key);
+});
+$('rows').addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-key]');
+  if (tr && tr.dataset.key) focusSpot(tr.dataset.key);
+});
+$('baseSeg').addEventListener('click', e => {
+  const b = e.target.closest('button[data-base]');
+  if (b) setBase(b.dataset.base);
 });
 
-$('fit').addEventListener('click',()=>{
-  const pts=filtered.filter(r=>r.valid).map(r=>[r.lat,r.lon]);
-  if (pts.length) map.fitBounds(pts,{padding:[25,25],maxZoom:15});
+['plate', 'start', 'end', 'dedupe'].forEach(id => $(id).addEventListener('change', () => applyFilters(true)));
+$('camera').addEventListener('input', () => applyFilters(true));
+$('fit').addEventListener('click', fitAll);
+
+$('clear').addEventListener('click', () => {
+  $('plate').value = ''; $('camera').value = ''; $('start').value = ''; $('end').value = '';
+  applyFilters(true);
 });
 
-$('export').addEventListener('click',()=>{
-  if (!filtered.length) {
-    alert('ไม่มีข้อมูลให้ส่งออก');
-    return;
-  }
-
-  const header=['ทะเบียนรถ','ชื่อจุด','วันเวลา','LAT','LONG','จำนวนครั้ง'];
-  const rows=filtered.map(r=>[
-    r.plate,r.camera,formatDate(r.date),r.lat,r.lon,r.count
+$('export').addEventListener('click', () => {
+  if (!view.length) { alert('ไม่มีข้อมูลให้ส่งออก'); return; }
+  const head = ['ทะเบียนรถ', 'จังหวัด', 'จุดติดตั้งกล้อง', 'แหล่งข้อมูล', 'วันที่', 'เวลา', 'ละติจูด', 'ลองจิจูด', 'ผ่านจุดนี้รวม(ครั้ง)'];
+  const body = view.map(r => [
+    r.plate, r.province, r.camera, r.agency, isoLocal(r.date), fmtTime(r.date),
+    r.valid ? r.lat : '', r.valid ? r.lon : '', r.valid && spotMap.get(r.key) ? spotMap.get(r.key).hits : ''
   ]);
-
-  const csv='\uFEFF'+[header,...rows].map(row=>
-    row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')
-  ).join('\r\n');
-
-  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;
-  a.download='vehicle_passage_analysis.csv';
-  a.click();
-  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  const csv = '\uFEFF' + [head, ...body].map(row =>
+    row.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(',')).join('\r\n');
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = 'vehicle_passage_analysis.csv'; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 
+/* ---------------- เริ่มต้น ---------------- */
 initMap();
+if (EMBEDDED.length) processRows(EMBEDDED, EMBEDDED_NAME);
+else $('status').textContent = 'กรุณานำเข้าไฟล์ Excel หรือ CSV';
+window.addEventListener('load', () => map.invalidateSize());
 </script>
 </body>
 </html>
